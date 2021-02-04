@@ -13,8 +13,9 @@ export default class EditServiceConfigCommand implements ICommand {
     registerCommand(context, this.command, false, this.execCommand.bind(this));
   }
   async execCommand(node: ControllerResourceNode) {
+    console.log(111, node);
     if (!node) {
-      host.showWarnMessage("A task is running, please try again later");
+      host.showWarnMessage("33A task is running, please try again later");
       return;
     }
     const appNode = node.getAppNode();

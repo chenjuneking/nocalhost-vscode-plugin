@@ -11,7 +11,7 @@ import {
   IApplicationMeta,
   IApplicationMetaSvcProfile,
 } from "./index.types";
-import * as shell from "../../ctl/shell";
+import { execAsyncWithReturn, ShellResult } from "../../ctl/shell";
 import services, { ServiceResult } from "./services";
 import { DATA_CENTER_INTERVAL_MS } from "../../constants";
 
@@ -20,6 +20,12 @@ interface IDataStore {
   applicationMetas: Map<string, IApplicationMeta>;
   applicationDescribes: Map<string, IApplicationDescribe>;
   applicationConfigs: Map<string, IApplicationConfig>;
+  ctlResponses: ICtlResponse[];
+}
+export interface ICtlResponse {
+  command: string;
+  args: any[];
+  result: ShellResult;
 }
 export interface IExecCommandResult {
   success: boolean;
@@ -40,7 +46,7 @@ export default class DataCenter {
   public static async execCommand(
     command: string
   ): Promise<IExecCommandResult> {
-    const shellObj = await shell.execAsyncWithReturn(command, []);
+    const shellObj: ShellResult = await execAsyncWithReturn(command, []);
     const success: boolean = shellObj.code === 0;
     const value: string =
       shellObj.code === 0 ? shellObj.stdout : shellObj.stderr;
@@ -52,10 +58,11 @@ export default class DataCenter {
     applicationMetas: new Map<string, IApplicationMeta>(),
     applicationDescribes: new Map<string, IApplicationDescribe>(),
     applicationConfigs: new Map<string, IApplicationConfig>(),
+    ctlResponses: [],
   };
   private listeners: ApplicationListener[] = [];
 
-  private constructor(timeout?: number) {
+  private constructor(timeout: number) {
     this.setApplications(timeout);
   }
 
@@ -76,6 +83,7 @@ export default class DataCenter {
         await this.fetchApplicationMeta(context.applicationName);
         await this.fetchApplicationDescribe(context.applicationName);
         await this.fetchApplicationConfig(context.applicationName);
+        await this.updateCtlResponse();
         return {
           id: result.id,
           context: context,
@@ -101,11 +109,11 @@ export default class DataCenter {
     }
 
     // TODO: DO NOT DELETE, FOR: [auto refresh]
-    // if (timeout) {
-    //   setTimeout(() => {
-    //     this.setApplications(timeout);
-    //   }, timeout);
-    // }
+    if (timeout) {
+      setTimeout(() => {
+        this.setApplications(timeout);
+      }, timeout);
+    }
   }
 
   private async fetchApplicationMeta(applicationName: string): Promise<void> {
@@ -299,6 +307,53 @@ export default class DataCenter {
     applicationName: string
   ): IApplicationConfig | undefined {
     return this.dataStore.applicationConfigs.get(applicationName);
+  }
+
+  public getCtlResponse(
+    command: string,
+    args: any[]
+  ): ICtlResponse | undefined {
+    return this.dataStore.ctlResponses.filter((ctlResponse: ICtlResponse) => {
+      return (
+        ctlResponse.command === command &&
+        JSON.stringify(args) === JSON.stringify(args)
+      );
+    })[0];
+  }
+
+  public setCtlResponse(
+    command: string,
+    args: any[],
+    result: ShellResult
+  ): void {
+    const exist: boolean = this.dataStore.ctlResponses.some(
+      (ctlResponse: ICtlResponse) => {
+        return (
+          ctlResponse.command === command &&
+          JSON.stringify(args) === JSON.stringify(args)
+        );
+      }
+    );
+    if (!exist) {
+      this.dataStore.ctlResponses.push({
+        command,
+        args,
+        result,
+      });
+    }
+  }
+
+  public async updateCtlResponse(): Promise<void> {
+    for (let i = 0, len = this.dataStore.ctlResponses.length; i < len; i++) {
+      const ctlResponse: ICtlResponse = this.dataStore.ctlResponses[i];
+      const { command, args } = ctlResponse;
+      const result: ShellResult = await execAsyncWithReturn(
+        command,
+        args,
+        false
+      );
+      ctlResponse.result = result;
+    }
   }
 
   public addListener(listener: ApplicationListener): void {

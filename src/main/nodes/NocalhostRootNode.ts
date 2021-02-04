@@ -27,8 +27,6 @@ export class NocalhostRootNode implements BaseNocalhostNode {
   async getChildren(
     parent?: BaseNocalhostNode
   ): Promise<Array<AppNode | NocalhostAccountNode>> {
-    DataCenter.getInstance().setApplications();
-
     const res = await getApplication();
     let all: Array<Promise<any>> = [];
     NocalhostRootNode.childNodes = res.map((app) => {

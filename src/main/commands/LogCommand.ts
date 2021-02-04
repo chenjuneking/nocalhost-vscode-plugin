@@ -25,7 +25,6 @@ export default class LogCommand implements ICommand {
     ({ podName, containerName } = await this.getPodAndContainer(node));
 
     if (podName && containerName) {
-      const kubeConfig: string = node.getKubeConfigPath();
       NocalhostWebviewPanel.open({
         url: "/logs",
         title: `${podName}/${containerName}`,
@@ -37,6 +36,10 @@ export default class LogCommand implements ICommand {
           container: containerName,
         },
       });
+    } else {
+      vscode.window.showInformationMessage(
+        `Pod is not ready, please try again later`
+      );
     }
   }
 

@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import host, { Host } from "../host";
 import * as shell from "shelljs";
+import DataCenter, { ICtlResponse } from "../common/DataCenter";
 export interface ShellResult {
   code: number;
   stdout: string;
@@ -9,7 +10,8 @@ export interface ShellResult {
 
 export async function execAsyncWithReturn(
   command: string,
-  args: Array<any>
+  args: Array<any>,
+  cached = true
 ): Promise<ShellResult> {
   // host.log(`[cmd] ${command}`, true);
   return new Promise((resolve, reject) => {
@@ -20,6 +22,17 @@ export async function execAsyncWithReturn(
     let stderr = "";
     proc.on("close", (code) => {
       if (code === 0) {
+        if (cached) {
+          const dataCenter: DataCenter = DataCenter.getInstance();
+          const ctlResponse:
+            | ICtlResponse
+            | undefined = dataCenter.getCtlResponse(command, args);
+          if (ctlResponse) {
+            resolve(ctlResponse.result);
+            return;
+          }
+          dataCenter.setCtlResponse(command, args, { stdout, stderr, code });
+        }
         resolve({ stdout, stderr, code });
       } else {
         reject(stderr);
